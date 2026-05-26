@@ -11,11 +11,28 @@ use App\Models\DivisaTransaction;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Totales de Divisas
-        $entradas = DivisaTransaction::whereIn('tipo', ['entrada', 'saldo_inicial'])->sum('monto');
-        $salidas = DivisaTransaction::where('tipo', 'salida')->sum('monto');
+        $request->validate([
+            'fecha_desde' => ['nullable', 'date'],
+            'fecha_hasta' => ['nullable', 'date', 'after_or_equal:fecha_desde'],
+        ]);
+
+        $fechaDesde = $request->input('fecha_desde');
+        $fechaHasta = $request->input('fecha_hasta');
+
+        $divisasQuery = DivisaTransaction::query();
+
+        if ($fechaDesde) {
+            $divisasQuery->whereDate('fecha', '>=', $fechaDesde);
+        }
+
+        if ($fechaHasta) {
+            $divisasQuery->whereDate('fecha', '<=', $fechaHasta);
+        }
+
+        $entradas = (clone $divisasQuery)->whereIn('tipo', ['entrada', 'saldo_inicial'])->sum('monto');
+        $salidas = (clone $divisasQuery)->where('tipo', 'salida')->sum('monto');
         $saldoDivisas = $entradas - $salidas;
 
         // Totales Bancos
@@ -25,27 +42,34 @@ class DashboardController extends Controller
         $totalCuentasCobrar = CuentaCobrar::where('estado', 'pendiente')->sum('monto');
         $totalCuentasPagar = CuentaPagar::where('estado', 'pendiente')->sum('monto');
 
-        // Datos para Gráficas (últimos 7 días)
         $fechas = collect();
         $datosEntradas = collect();
         $datosSalidas = collect();
 
-        for ($i = 6; $i >= 0; $i--) {
-            $fecha = now()->subDays($i)->format('Y-m-d');
-            $fechas->push($fecha);
-            
-            $entradaDia = DivisaTransaction::where('tipo', 'entrada')->whereDate('fecha', $fecha)->sum('monto');
-            $salidaDia = DivisaTransaction::where('tipo', 'salida')->whereDate('fecha', $fecha)->sum('monto');
-            
-            $datosEntradas->push($entradaDia);
-            $datosSalidas->push($salidaDia);
+        $inicioGrafica = $fechaDesde ? now()->parse($fechaDesde) : now()->subDays(6);
+        $finGrafica = $fechaHasta ? now()->parse($fechaHasta) : now();
+
+        if ($inicioGrafica->diffInDays($finGrafica) > 31) {
+            $inicioGrafica = $finGrafica->copy()->subDays(31);
+        }
+
+        for ($fecha = $inicioGrafica->copy(); $fecha->lte($finGrafica); $fecha->addDay()) {
+            $fechaConsulta = $fecha->format('Y-m-d');
+            $fechas->push($fecha->format('d/m'));
+
+            $entradaDiaQuery = DivisaTransaction::whereIn('tipo', ['entrada', 'saldo_inicial'])->whereDate('fecha', $fechaConsulta);
+            $salidaDiaQuery = DivisaTransaction::where('tipo', 'salida')->whereDate('fecha', $fechaConsulta);
+
+            $datosEntradas->push($entradaDiaQuery->sum('monto'));
+            $datosSalidas->push($salidaDiaQuery->sum('monto'));
         }
 
         return view('dashboard', compact(
             'saldoDivisas', 'entradas', 'salidas', 
             'saldoBancos', 
             'totalCuentasCobrar', 'totalCuentasPagar',
-            'fechas', 'datosEntradas', 'datosSalidas'
+            'fechas', 'datosEntradas', 'datosSalidas',
+            'fechaDesde', 'fechaHasta'
         ));
     }
 }

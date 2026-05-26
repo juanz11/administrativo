@@ -8,9 +8,31 @@ use Carbon\Carbon;
 
 class DivisaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $transactions = DivisaTransaction::orderBy('fecha', 'desc')->orderBy('id', 'desc')->take(20)->get();
+        $request->validate([
+            'fecha_desde' => ['nullable', 'date'],
+            'fecha_hasta' => ['nullable', 'date', 'after_or_equal:fecha_desde'],
+        ]);
+
+        $fechaDesde = $request->input('fecha_desde');
+        $fechaHasta = $request->input('fecha_hasta');
+
+        $transactionsQuery = DivisaTransaction::query();
+
+        if ($fechaDesde) {
+            $transactionsQuery->whereDate('fecha', '>=', $fechaDesde);
+        }
+
+        if ($fechaHasta) {
+            $transactionsQuery->whereDate('fecha', '<=', $fechaHasta);
+        }
+
+        $transactions = $transactionsQuery
+            ->orderBy('fecha', 'desc')
+            ->orderBy('id', 'desc')
+            ->take(20)
+            ->get();
         
         // Prepare chart data (last 7 days of transactions or so)
         $fechas = collect();
@@ -36,13 +58,14 @@ class DivisaController extends Controller
         $saldoActual = DivisaTransaction::where('tipo', 'entrada')->sum('monto') 
                      - DivisaTransaction::where('tipo', 'salida')->sum('monto');
 
-        return view('divisas.index', compact('transactions', 'fechas', 'datosEntradas', 'datosSalidas', 'saldoActual'));
+        return view('divisas.index', compact('transactions', 'fechas', 'datosEntradas', 'datosSalidas', 'saldoActual', 'fechaDesde', 'fechaHasta'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
             'tipo' => 'required|in:entrada,salida',
+            'medio' => 'required|in:banco,efectivo',
             'monto' => 'required|numeric|min:0.01',
             'fecha' => 'required|date',
             'descripcion' => 'nullable|string|max:255',

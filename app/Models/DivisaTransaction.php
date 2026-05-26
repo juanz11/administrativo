@@ -11,6 +11,7 @@ class DivisaTransaction extends Model
 
     protected $fillable = [
         'tipo',
+        'medio',
         'monto',
         'descripcion',
         'fecha',

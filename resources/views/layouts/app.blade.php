@@ -211,6 +211,23 @@
             color: var(--text-main);
         }
 
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-weight: 600;
+        }
+
+        .logout-button {
+            border: none;
+            border-radius: 8px;
+            padding: 9px 12px;
+            background: var(--danger-color);
+            color: #ffffff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
     </style>
 </head>
 <body>
@@ -246,8 +263,11 @@
         <header class="topbar">
             <div class="topbar-title">@yield('title', 'Inicio')</div>
             <div class="user-profile">
-                <!-- Placeholder for user auth -->
-                Admin
+                <span>{{ session('panel_user', 'Admin') }}</span>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="logout-button">Salir</button>
+                </form>
             </div>
         </header>
 

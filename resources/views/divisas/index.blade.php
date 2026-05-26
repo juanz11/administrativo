@@ -119,9 +119,35 @@
         border: 1px solid rgba(16, 185, 129, 0.2);
     }
 
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        align-items: end;
+        margin-bottom: 20px;
+    }
+
+    .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
     /* Responsive */
     @media (max-width: 1024px) {
         .divisas-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-form {
             grid-template-columns: 1fr;
         }
     }
@@ -141,6 +167,14 @@
                 <select id="tipo" name="tipo" class="form-control" required>
                     <option value="entrada">Entrada (+)</option>
                     <option value="salida">Salida (-)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="medio">Medio</label>
+                <select id="medio" name="medio" class="form-control" required>
+                    <option value="banco">Banco</option>
+                    <option value="efectivo">Efectivo</option>
                 </select>
             </div>
             
@@ -179,22 +213,46 @@
 <!-- Historial / Tabla -->
 <div class="table-wrapper">
     <h3 style="margin-bottom: 20px;">Historial de Movimientos</h3>
+
+    <form method="GET" action="{{ route('divisas.index') }}" class="filter-form">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="fecha_desde">Desde</label>
+            <input type="date" id="fecha_desde" name="fecha_desde" class="form-control" value="{{ $fechaDesde }}">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="fecha_hasta">Hasta</label>
+            <input type="date" id="fecha_hasta" name="fecha_hasta" class="form-control" value="{{ $fechaHasta }}">
+        </div>
+
+        <button type="submit" class="btn-submit">Filtrar</button>
+        <a href="{{ route('divisas.index') }}" class="btn-secondary">Limpiar</a>
+    </form>
+
+    @if ($errors->any())
+        <div style="color: var(--danger-color); font-weight: 600; margin-bottom: 16px;">
+            {{ $errors->first() }}
+        </div>
+    @endif
+
     <table class="table" id="transactions-table">
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Fecha</th>
                 <th>Descripción</th>
+                <th>Medio</th>
                 <th>Tipo</th>
                 <th>Monto</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($transactions as $t)
+            @forelse($transactions as $t)
             <tr>
                 <td>#{{ $t->id }}</td>
                 <td>{{ $t->fecha->format('d/m/Y') }}</td>
                 <td>{{ $t->descripcion ?? '-' }}</td>
+                <td>{{ ucfirst($t->medio ?? 'efectivo') }}</td>
                 <td>
                     <span class="badge {{ $t->tipo == 'entrada' ? 'badge-entrada' : 'badge-salida' }}">
                         {{ ucfirst($t->tipo) }}
@@ -204,7 +262,11 @@
                     {{ $t->tipo == 'entrada' ? '+' : '-' }}${{ number_format($t->monto, 2) }}
                 </td>
             </tr>
-            @endforeach
+            @empty
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No hay movimientos para el filtro seleccionado.</td>
+            </tr>
+            @endforelse
         </tbody>
     </table>
 </div>
@@ -300,12 +362,14 @@
                     const amountColor = t.tipo === 'entrada' ? 'var(--success-color)' : 'var(--danger-color)';
                     const amountSign = t.tipo === 'entrada' ? '+' : '-';
                     const formattedMonto = parseFloat(t.monto).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const medio = t.medio ? t.medio.charAt(0).toUpperCase() + t.medio.slice(1) : 'Efectivo';
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>#${t.id}</td>
                         <td>${formattedDate}</td>
                         <td>${t.descripcion || '-'}</td>
+                        <td>${medio}</td>
                         <td><span class="badge ${badgeClass}">${t.tipo.charAt(0).toUpperCase() + t.tipo.slice(1)}</span></td>
                         <td style="font-weight: 600; color: ${amountColor}">${amountSign}$${formattedMonto}</td>
                     `;
