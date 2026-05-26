@@ -141,6 +141,12 @@
         cursor: pointer;
     }
 
+    .conversion-help {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-top: 6px;
+    }
+
     /* Responsive */
     @media (max-width: 1024px) {
         .divisas-grid {
@@ -179,8 +185,27 @@
             </div>
             
             <div class="form-group">
-                <label for="monto">Monto ($)</label>
-                <input type="number" id="monto" name="monto" class="form-control" step="0.01" min="0.01" required>
+                <label for="moneda_original">Moneda</label>
+                <select id="moneda_original" name="moneda_original" class="form-control" required>
+                    <option value="USD">Dólares ($)</option>
+                    <option value="VES">Bolívares (Bs)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="monto_original">Monto</label>
+                <input type="number" id="monto_original" name="monto_original" class="form-control" step="0.01" min="0.01" required>
+            </div>
+
+            <div class="form-group" id="tasa-cambio-group" style="display: none;">
+                <label for="tasa_cambio">Tasa de cambio</label>
+                <input type="number" id="tasa_cambio" name="tasa_cambio" class="form-control" step="0.0001" min="0.01" value="{{ $tasaOficial }}">
+                <div class="conversion-help">Por defecto se usa la tasa oficial del día, pero puedes cambiarla.</div>
+            </div>
+
+            <div class="form-group" id="equivalente-usd-group" style="display: none;">
+                <label>Equivalente en dólares</label>
+                <div class="form-control" id="equivalente-usd">$0.00</div>
             </div>
             
             <div class="form-group">
@@ -242,8 +267,9 @@
                 <th>Fecha</th>
                 <th>Descripción</th>
                 <th>Medio</th>
+                <th>Original</th>
                 <th>Tipo</th>
-                <th>Monto</th>
+                <th>Monto USD</th>
             </tr>
         </thead>
         <tbody>
@@ -253,6 +279,13 @@
                 <td>{{ $t->fecha->format('d/m/Y') }}</td>
                 <td>{{ $t->descripcion ?? '-' }}</td>
                 <td>{{ ucfirst($t->medio ?? 'efectivo') }}</td>
+                <td>
+                    @if (($t->moneda_original ?? 'USD') === 'VES')
+                        Bs {{ number_format($t->monto_original ?? 0, 2, ',', '.') }}
+                    @else
+                        ${{ number_format($t->monto_original ?? $t->monto, 2) }}
+                    @endif
+                </td>
                 <td>
                     <span class="badge {{ $t->tipo == 'entrada' ? 'badge-entrada' : 'badge-salida' }}">
                         {{ ucfirst($t->tipo) }}
@@ -264,7 +297,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No hay movimientos para el filtro seleccionado.</td>
+                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">No hay movimientos para el filtro seleccionado.</td>
             </tr>
             @endforelse
         </tbody>
@@ -315,6 +348,32 @@
         const alertSuccess = document.getElementById('alert-success');
         const tbody = document.querySelector('#transactions-table tbody');
         const saldoActualEl = document.getElementById('saldo-actual');
+        const monedaOriginal = document.getElementById('moneda_original');
+        const montoOriginal = document.getElementById('monto_original');
+        const tasaCambio = document.getElementById('tasa_cambio');
+        const tasaCambioGroup = document.getElementById('tasa-cambio-group');
+        const equivalenteUsdGroup = document.getElementById('equivalente-usd-group');
+        const equivalenteUsd = document.getElementById('equivalente-usd');
+
+        function actualizarConversion() {
+            const usaBolivares = monedaOriginal.value === 'VES';
+            tasaCambioGroup.style.display = usaBolivares ? 'block' : 'none';
+            equivalenteUsdGroup.style.display = usaBolivares ? 'block' : 'none';
+
+            if (!usaBolivares) {
+                return;
+            }
+
+            const monto = parseFloat(montoOriginal.value);
+            const tasa = parseFloat(tasaCambio.value);
+            const equivalente = monto > 0 && tasa > 0 ? monto / tasa : 0;
+            equivalenteUsd.textContent = '$' + equivalente.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        monedaOriginal.addEventListener('change', actualizarConversion);
+        montoOriginal.addEventListener('input', actualizarConversion);
+        tasaCambio.addEventListener('input', actualizarConversion);
+        actualizarConversion();
 
         form.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -343,6 +402,8 @@
                     // Reset form partially
                     form.reset();
                     document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+                    tasaCambio.value = "{{ $tasaOficial }}";
+                    actualizarConversion();
 
                     // Update Chart Data
                     chart.data.labels = res.chartData.labels;
@@ -363,6 +424,9 @@
                     const amountSign = t.tipo === 'entrada' ? '+' : '-';
                     const formattedMonto = parseFloat(t.monto).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     const medio = t.medio ? t.medio.charAt(0).toUpperCase() + t.medio.slice(1) : 'Efectivo';
+                    const moneda = t.moneda_original || 'USD';
+                    const originalAmount = parseFloat(t.monto_original || t.monto).toLocaleString(moneda === 'VES' ? 'de-DE' : 'en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const originalText = moneda === 'VES' ? `Bs ${originalAmount}` : `$${originalAmount}`;
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
@@ -370,6 +434,7 @@
                         <td>${formattedDate}</td>
                         <td>${t.descripcion || '-'}</td>
                         <td>${medio}</td>
+                        <td>${originalText}</td>
                         <td><span class="badge ${badgeClass}">${t.tipo.charAt(0).toUpperCase() + t.tipo.slice(1)}</span></td>
                         <td style="font-weight: 600; color: ${amountColor}">${amountSign}$${formattedMonto}</td>
                     `;

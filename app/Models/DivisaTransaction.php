@@ -12,6 +12,9 @@ class DivisaTransaction extends Model
     protected $fillable = [
         'tipo',
         'medio',
+        'moneda_original',
+        'monto_original',
+        'tasa_cambio',
         'monto',
         'descripcion',
         'fecha',
@@ -20,5 +23,7 @@ class DivisaTransaction extends Model
     protected $casts = [
         'fecha' => 'date',
         'monto' => 'decimal:2',
+        'monto_original' => 'decimal:2',
+        'tasa_cambio' => 'decimal:4',
     ];
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\DivisaTransaction;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 
 class DivisaController extends Controller
 {
@@ -58,7 +59,19 @@ class DivisaController extends Controller
         $saldoActual = DivisaTransaction::where('tipo', 'entrada')->sum('monto') 
                      - DivisaTransaction::where('tipo', 'salida')->sum('monto');
 
-        return view('divisas.index', compact('transactions', 'fechas', 'datosEntradas', 'datosSalidas', 'saldoActual', 'fechaDesde', 'fechaHasta'));
+        $tasaOficial = null;
+
+        try {
+            $response = Http::timeout(5)->get('https://ve.dolarapi.com/v1/dolares');
+
+            if ($response->successful()) {
+                $tasaOficial = collect($response->json())->firstWhere('fuente', 'oficial')['promedio'] ?? null;
+            }
+        } catch (\Throwable $exception) {
+            $tasaOficial = null;
+        }
+
+        return view('divisas.index', compact('transactions', 'fechas', 'datosEntradas', 'datosSalidas', 'saldoActual', 'fechaDesde', 'fechaHasta', 'tasaOficial'));
     }
 
     public function store(Request $request)
@@ -66,12 +79,32 @@ class DivisaController extends Controller
         $request->validate([
             'tipo' => 'required|in:entrada,salida',
             'medio' => 'required|in:banco,efectivo',
-            'monto' => 'required|numeric|min:0.01',
+            'moneda_original' => 'required|in:USD,VES',
+            'monto_original' => 'required|numeric|min:0.01',
+            'tasa_cambio' => 'required_if:moneda_original,VES|nullable|numeric|min:0.01',
             'fecha' => 'required|date',
             'descripcion' => 'nullable|string|max:255',
         ]);
 
-        $transaction = DivisaTransaction::create($request->all());
+        $data = $request->only([
+            'tipo',
+            'medio',
+            'moneda_original',
+            'monto_original',
+            'tasa_cambio',
+            'fecha',
+            'descripcion',
+        ]);
+
+        $data['monto'] = $data['moneda_original'] === 'VES'
+            ? round($data['monto_original'] / $data['tasa_cambio'], 2)
+            : round($data['monto_original'], 2);
+
+        if ($data['moneda_original'] === 'USD') {
+            $data['tasa_cambio'] = null;
+        }
+
+        $transaction = DivisaTransaction::create($data);
 
         // Prepare updated chart data to send back
         $fechas = [];
