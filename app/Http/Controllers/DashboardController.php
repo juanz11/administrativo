@@ -8,6 +8,7 @@ use App\Models\Banco;
 use App\Models\CuentaCobrar;
 use App\Models\CuentaPagar;
 use App\Models\DivisaTransaction;
+use Illuminate\Support\Facades\Http;
 
 class DashboardController extends Controller
 {
@@ -64,12 +65,25 @@ class DashboardController extends Controller
             $datosSalidas->push($salidaDiaQuery->sum('monto'));
         }
 
+        $tasasDolar = collect();
+
+        try {
+            $response = Http::timeout(5)->get('https://ve.dolarapi.com/v1/dolares');
+
+            if ($response->successful()) {
+                $tasasDolar = collect($response->json())->keyBy('fuente');
+            }
+        } catch (\Throwable $exception) {
+            $tasasDolar = collect();
+        }
+
         return view('dashboard', compact(
             'saldoDivisas', 'entradas', 'salidas', 
             'saldoBancos', 
             'totalCuentasCobrar', 'totalCuentasPagar',
             'fechas', 'datosEntradas', 'datosSalidas',
-            'fechaDesde', 'fechaHasta'
+            'fechaDesde', 'fechaHasta',
+            'tasasDolar'
         ));
     }
 }

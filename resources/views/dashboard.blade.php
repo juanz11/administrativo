@@ -14,6 +14,41 @@
         margin-bottom: 24px;
     }
 
+    .dolar-rates {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .dolar-card {
+        background-color: var(--card-bg);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .dolar-card-title {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .dolar-card-value {
+        color: var(--text-main);
+        font-size: 1.75rem;
+        font-weight: 800;
+    }
+
+    .dolar-card-date {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        margin-top: 8px;
+    }
+
     .filter-form {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -67,6 +102,25 @@
         }
     }
 </style>
+
+<div class="dolar-rates">
+    @php($tasa = $tasasDolar->get('oficial'))
+    <div class="dolar-card">
+        <div class="dolar-card-title">Dólar Oficial</div>
+        <div class="dolar-card-value">
+            @if ($tasa)
+                Bs {{ number_format($tasa['promedio'], 2, ',', '.') }}
+            @else
+                No disponible
+            @endif
+        </div>
+        @if ($tasa)
+            <div class="dolar-card-date">
+                Actualizado: {{ \Carbon\Carbon::parse($tasa['fechaActualizacion'])->format('d/m/Y H:i') }}
+            </div>
+        @endif
+    </div>
+</div>
 
 <div class="dashboard-filter">
     <form method="GET" action="{{ route('dashboard') }}" class="filter-form">
