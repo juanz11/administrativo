@@ -250,6 +250,9 @@
                 <a href="{{ route('bancos.index') }}" class="nav-link {{ request()->routeIs('bancos.*') ? 'active' : '' }}">Bancos</a>
             </li>
             <li class="nav-item">
+                <a href="{{ route('estadisticas.grafica') }}" class="nav-link {{ request()->routeIs('estadisticas.*') ? 'active' : '' }}">Estadísticas de Ventas</a>
+            </li>
+            <li class="nav-item">
                 <a href="#" class="nav-link">Cuentas por Cobrar</a>
             </li>
             <li class="nav-item">
